@@ -1,8 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'dart:async';
-import 'package:flushbar/flushbar.dart';
 import 'package:project_two/views/detail_page.dart';
+import 'package:draggable_scrollbar/draggable_scrollbar.dart';
 
 class ListPage extends StatefulWidget {
   @override
@@ -10,104 +9,86 @@ class ListPage extends StatefulWidget {
 }
 
 class _ListPageState extends State<ListPage> {
-  Future _data;
-  Future getOrders() async {
-    var firestore = Firestore.instance;
-    QuerySnapshot qn = await firestore
-        .collection("orders")
-        .orderBy("ordered at", descending: true)
-        .getDocuments();
-    return qn.documents;
-  }
+  ScrollController _scrollController = ScrollController();
 
-  navigateToDetail(DocumentSnapshot post) {
-    Navigator.push(
-        context,
-        MaterialPageRoute(
-            builder: (context) => DetailPage(
-                  post: post,
-                )));
-  }
 
   @override
-  void initState() {
-    super.initState();
-    _data = getOrders();
-  }
 
   @override
   Widget build(BuildContext context) {
-    var firestore = Firestore.instance;
-    return Container(
-      child: FutureBuilder(
-          future: _data,
-          builder: (_, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return Center(
-                child: CircularProgressIndicator(
-                  backgroundColor: Colors.cyan,
-                  strokeWidth: 5,
-                ),
-              );
-            } else {
-              return ListView.builder(
-                  itemCount:
-                      snapshot.data.length == null ? 0 : snapshot.data.length,
-                  itemBuilder: (_, index) {
-                    return ListTile(
-                      leading: Icon(Icons.person),
-                      title: Text(snapshot.data[index].data["name"] ??
-                          "There is an error somewhere"),
-                      subtitle: Text(snapshot.data[index].data["ordered at"]),
-                      trailing: IconButton(
-                        tooltip: 'Delete',
-                        icon: Icon(Icons.delete),
-                        onPressed: () async {
-                          return showDialog<void>(
-                              context: context,
-                              barrierDismissible: false, //user must tap button
-                              builder: (BuildContext context) {
-                                return AlertDialog(
-                                  title: Text('Delete?'),
-                                  content: Text("Delete " +
-                                      snapshot.data[index].data["name"] +
-                                      "'s order?"),
-                                  actions: [
-                                    FlatButton(
-                                      child: Text('No'),
-                                      onPressed: () {
-                                        Navigator.of(context).pop();
-                                      },
-                                    ),
-                                    FlatButton(
-                                      child: Text('Yes'),
-                                      onPressed: () async {
-                                        await firestore.runTransaction(
-                                            (Transaction myTransaction) async {
-                                          await myTransaction.delete(
-                                              snapshot.data[index].reference);
-                                        });
-                                        Navigator.of(context).pop();
-                                        Flushbar(
-                                          title: "Deleted!",
-                                          message: "The order has been deleted",
-                                          duration: Duration(seconds: 3),
-                                        ).show(context);
-                                        setState(() {
-                                          Navigator.of(context).pushNamedAndRemoveUntil('/screen2', (Route<dynamic> route) => false);
-                                        });
-                                      },
-                                    )
-                                  ],
-                                );
-                              });
-                        },
-                      ),
-                      onTap: () => navigateToDetail(snapshot.data[index]),
+    var firestore = FirebaseFirestore.instance;
+    return StreamBuilder(
+      stream: firestore
+          .collection('orders')
+          .orderBy('ordered at', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        return snapshot.hasData
+            ? DraggableScrollbar.semicircle(
+              controller: _scrollController,
+              labelConstraints: BoxConstraints.tightFor(width: 80.0, height: 30.0),
+                child: ListView.builder(
+                  controller: _scrollController,
+                  itemCount: snapshot.data.documents.length,
+                  itemBuilder: (context, index) {
+                    return BodyList(
+                      name: snapshot.data.documents[index].data()['name'],
+                      date: snapshot.data.documents[index].data()['ordered at'],
+                      index: snapshot.data.documents[index],
+                      reference: snapshot.data.documents[index].reference,
+                      isChecked:
+                          snapshot.data.documents[index].data()['checked'],
+                      isStarred:
+                          snapshot.data.documents[index].data()['starred'],
                     );
-                  });
-            }
-          }),
+                  },
+                ),
+              )
+            : Center(child: CircularProgressIndicator());
+      },
+    );
+  }
+}
+
+class BodyList extends StatefulWidget {
+  final String name;
+  final String date;
+  final DocumentReference reference;
+  final DocumentSnapshot index;
+  final bool isChecked;
+  final bool isStarred;
+  BodyList(
+      {this.name,
+      this.date,
+      this.reference,
+      this.index,
+      this.isChecked,
+      this.isStarred});
+
+  @override
+  _BodyListState createState() => _BodyListState();
+}
+
+class _BodyListState extends State<BodyList> {
+  var firestore = FirebaseFirestore.instance;
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(Icons.person),
+      title: Text(widget.name ?? "There is an error somewhere"),
+      subtitle: Text(widget.date),
+      tileColor: widget.isChecked ? Colors.green.withOpacity(0.5) : null,
+      trailing: widget.isStarred ? Icon(Icons.star) : null,
+      onTap: () {
+        Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => DetailPage(
+                    post: widget.index,
+                    reference: widget.reference,
+                    isChecked: widget.isChecked,
+                    isStarred: widget.isStarred)));
+      },
     );
   }
 }

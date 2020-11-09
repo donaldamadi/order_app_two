@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:project_two/views/list_page.dart';
 import 'package:splashscreen/splashscreen.dart';
+import 'package:firebase_core/firebase_core.dart';
 
-void main() {
-  runApp(MaterialApp(
+
+void main() async{
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  runApp(
+    MaterialApp(
     debugShowCheckedModeBanner: false,
     home: MyApp(),
     theme: ThemeData(
@@ -54,18 +59,6 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: AppBar(
         title: Text(widget.title),
         automaticallyImplyLeading: false,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: IconButton(
-              icon: Icon(Icons.refresh),
-              tooltip: "Refresh",
-              onPressed: (){
-                Navigator.of(context).pushNamedAndRemoveUntil('/screen2', (Route<dynamic> route) => false);
-              },
-            ),
-          ),
-        ],
       ),
       body:ListPage(),
     );
